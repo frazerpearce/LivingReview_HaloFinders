@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.DS_Store
+*.fits
+*.tif
+*.tiff
+*.pdf
+*.npy
+*.npz
+*.pkl
+*_particles
+*_halos
+*_subhalosLRdata/cosmological_*.hdf5
+LRdata/cosmological_*_derived.txt
