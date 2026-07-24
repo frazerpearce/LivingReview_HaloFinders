@@ -34,6 +34,11 @@ Supported inputs
     Memberships are reconstructed from SubhaloOffsetType/SubhaloLenType and the
     corresponding HDF5 snapshot particle ordering.
 
+--new-finder
+    Output from a new halo finder. Edit Import_new_finder.py to read the
+    finder's native files. The common converter then packs and validates the
+    returned halo properties and particle-membership lists.
+
 AHF properties use Xc/Yc/Zc and Mhalo/Rhalo or Mvir/Rvir. Rockstar uses M200c
 when it is positive and otherwise Mvir, and uses R200c when available and otherwise Rvir.
 SUBFIND uses SubhaloPos and SubhaloMass. The first (central) subhalo in each
@@ -57,6 +62,8 @@ from pathlib import Path
 import h5py
 import numpy as np
 
+from Import_new_finder import FINDER_KEY, import_new_finder
+
 ROCKSTAR_MAGIC = np.uint64(0xFADEDACEC0C0D0D0)
 ROCKSTAR_HEADER_SIZE = 256
 ROCKSTAR_FORMAT_REVISION = 1
@@ -74,19 +81,6 @@ MPC_TO_KPC = 1.0e3
 
 class CatalogueError(RuntimeError):
     pass
-
-
-# NEW FINDER CHECKLIST
-# --------------------
-# 1. Add ``read_<finder>()`` at the reader stub below. It must return:
-#      haloid, centre, catalogue_mass, catalogue_radius,
-#      offset, particle_id, catalogue_files
-# 2. Add one mutually exclusive CLI option in ``build_parser()``.
-# 3. Add one dispatch branch in ``main()`` and set ``finder`` to the same key
-#    registered in finder_config.py.
-# 4. Convert units before returning: centre/radius in kpc/h, mass in Msun/h,
-#    haloid int64, offset int64, and particle_id uint64.
-# 5. Let the existing validators and write_output() create the common HDF5.
 
 
 def natural_key(path: Path) -> tuple[int | str, ...]:
@@ -1181,28 +1175,44 @@ def pack_memberships(
     return halo_array, offsets, particle_ids
 
 
-# NEW FINDER READER STUB
-# ----------------------
-# Copy this template, remove the leading comments, and implement catalogue
-# parsing above ``pack_memberships`` (or alongside the other finder readers):
-#
-# def read_newfinder(
-#     spec: str,
-#     snapshot_ids_by_type: dict[int, np.ndarray],
-# ) -> tuple[
-#     np.ndarray,  # haloid             int64   [Nhalo]
-#     np.ndarray,  # centre            float64 [Nhalo, 3], kpc/h
-#     np.ndarray,  # catalogue_mass    float64 [Nhalo], Msun/h
-#     np.ndarray,  # catalogue_radius  float64 [Nhalo], kpc/h
-#     np.ndarray,  # offset            int64   [Nhalo + 1]
-#     np.ndarray,  # particle_id       uint64  [Nmembership]
-#     list[Path],  # resolved input catalogue files
-# ]:
-#     files = expand_path_set(spec, suffixes=(".newfinder",))
-#     # Parse properties and build one uint64 membership array per halo.
-#     # packed = pack_memberships(halo_ids, membership_counts, memberships)
-#     # return packed[0], centres, masses, radii, packed[1], packed[2], files
-#     raise NotImplementedError
+def read_new_finder(
+    spec: str,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    list[Path],
+]:
+    """Import a participant's finder output and pack its memberships."""
+    halo_ids, centres, masses, radii, memberships = import_new_finder(spec)
+
+    halo_ids = np.asarray(halo_ids, dtype=np.int64)
+    centres = np.asarray(centres, dtype=np.float64)
+    masses = np.asarray(masses, dtype=np.float64)
+    radii = np.asarray(radii, dtype=np.float64)
+    membership_arrays = [np.asarray(values) for values in memberships]
+    counts = np.asarray(
+        [values.size for values in membership_arrays], dtype=np.int64
+    )
+    packed_ids, offsets, particle_ids = pack_memberships(
+        halo_ids, counts, membership_arrays
+    )
+
+    # Import_new_finder.py may read one file, several files, or a directory.
+    # Preserve the user-supplied location in the common-file provenance.
+    catalogue_inputs = [Path(spec).expanduser().resolve()]
+    return (
+        packed_ids,
+        centres,
+        masses,
+        radii,
+        offsets,
+        particle_ids,
+        catalogue_inputs,
+    )
 
 
 def validate_halo_ids(halo_ids: np.ndarray) -> None:
@@ -1397,8 +1407,7 @@ def build_parser() -> argparse.ArgumentParser:
     finder.add_argument("--ahf", metavar="CATALOGUE_SET")
     finder.add_argument("--rockstar", metavar="CATALOGUE_SET")
     finder.add_argument("--subfind", metavar="CATALOGUE_SET")
-    # NEW FINDER CLI STUB:
-    # finder.add_argument("--newfinder", metavar="CATALOGUE_SET")
+    finder.add_argument("--new-finder", metavar="CATALOGUE_SET")
     parser.add_argument("--snapshot", required=True, metavar="SNAPSHOT")
     parser.add_argument("-o", "--output", required=True, type=Path)
     parser.add_argument("--force", action="store_true", help="Replace an existing output file")
@@ -1446,18 +1455,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 particle_ids,
                 catalogue_files,
             ) = read_subfind(args.subfind, snapshot_ids_by_type)
-        # NEW FINDER DISPATCH STUB:
-        # elif args.newfinder is not None:
-        #     finder = "newfinder"
-        #     (
-        #         halo_ids,
-        #         centres,
-        #         masses,
-        #         radii,
-        #         offsets,
-        #         particle_ids,
-        #         catalogue_files,
-        #     ) = read_newfinder(args.newfinder, snapshot_ids_by_type)
+        elif args.new_finder is not None:
+            finder = FINDER_KEY
+            (
+                halo_ids,
+                centres,
+                masses,
+                radii,
+                offsets,
+                particle_ids,
+                catalogue_files,
+            ) = read_new_finder(args.new_finder)
         else:
             raise AssertionError("argparse did not select a finder")
 
@@ -1479,7 +1487,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             catalogue_files,
             snapshot_files,
         )
-    except (CatalogueError, OSError, ValueError) as exc:
+    except (CatalogueError, OSError, ValueError, NotImplementedError) as exc:
         parser.exit(2, f"error: {exc}\n")
 
     print(

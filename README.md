@@ -108,46 +108,50 @@ presence of every membership ID in the snapshot before writing the result.
 
 ## Adding another finder
 
-`convert_halo_membership.py` contains three marked extension points. Search for
-`NEW FINDER` to find them.
+All finder-specific file-reading code belongs in `Import_new_finder.py`. The
+main converter should not need to be edited.
 
-### 1. Implement the reader
+### 1. Set the finder key
 
-Copy the `read_newfinder()` template below the `NEW FINDER READER STUB`. Parse
-the native halo properties and one particle-ID array per halo, then return:
-
-```python
-(
-    haloid,             # int64   [Nhalo]
-    centre,             # float64 [Nhalo, 3], h^-1 kpc
-    catalogue_mass,     # float64 [Nhalo], h^-1 Msun
-    catalogue_radius,   # float64 [Nhalo], h^-1 kpc
-    offset,             # int64   [Nhalo + 1]
-    particle_id,        # uint64  [Nmembership]
-    catalogue_files,    # resolved native input files
-)
-```
-
-The supplied `pack_memberships()` helper builds `offset` and `particle_id`
-from per-halo membership arrays and checks their lengths.
-
-### 2. Add the command-line option
-
-At `NEW FINDER CLI STUB`, add a mutually exclusive option:
+At the top of `Import_new_finder.py`, replace:
 
 ```python
-finder.add_argument("--newfinder", metavar="CATALOGUE_SET")
+FINDER_KEY = "newfinder"
 ```
 
-Use a short, lowercase key in place of `newfinder`.
-
-### 3. Add the dispatch branch
-
-At `NEW FINDER DISPATCH STUB`, enable the template branch and call the reader.
-Set `finder` to exactly the same lowercase key used on the command line and in
+with a short, lowercase identifier for the finder. Use exactly the same key in
 `finder_config.py`.
 
-### 4. Register its name and plotting style
+### 2. Implement the native-file reader
+
+Edit only the clearly marked finder-specific block inside
+`import_new_finder()`. It must construct and return five objects:
+
+```python
+return halo_ids, centres, masses, radii, memberships
+```
+
+These are:
+
+```text
+halo_ids       one-dimensional array with one integer ID per halo
+centres        array [Nhalo, 3], in h^-1 kpc
+masses         one-dimensional array [Nhalo], in h^-1 Msun
+radii          one-dimensional array [Nhalo], in h^-1 kpc
+memberships    Python list of length Nhalo
+```
+
+`memberships[i]` is a one-dimensional list or array containing the original
+snapshot particle IDs assigned to halo `i`. All five objects must use the same
+halo ordering.
+
+An intentionally simple `numpy.loadtxt` example is included in the marked
+block. Replace it with the code needed for the new finder's files and delete
+the placeholder `NotImplementedError`. Do not construct HDF5 offsets or packed
+membership arrays in this file. `convert_halo_membership.py` does that and
+performs all shape, type, offset, unit-layout, and snapshot-ID validation.
+
+### 3. Register its name and plotting style
 
 Add an entry to `FINDERS` in `finder_config.py`:
 
@@ -181,13 +185,12 @@ Convert its native catalogue:
 
 ```bash
 python convert_halo_membership.py \
-  --newfinder path/to/unit_test/native_catalogue \
+  --new-finder path/to/unit_test/native_catalogue \
   --snapshot Simulation/data/unit_test_king_box.hdf5 \
   --output LRdata/unit_test_king_newfinder.hdf5
 ```
 
-Replace `--newfinder` with the option added for your reader. If an output
-already exists and should be replaced, add `--force`.
+If an output already exists and should be replaced, add `--force`.
 
 After registering the finder in `finder_config.py`, create the comparison
 figures and summary with:
@@ -212,7 +215,7 @@ Convert its output:
 
 ```bash
 python convert_halo_membership.py \
-  --newfinder path/to/king_infall/native_catalogue \
+  --new-finder path/to/king_infall/native_catalogue \
   --snapshot Simulation/data/king_infall.hdf5 \
   --output LRdata/king_infall_newfinder.hdf5
 ```
@@ -238,7 +241,7 @@ Run your finder on the supplied Gadget HDF5 snapshot and convert the result:
 
 ```bash
 python convert_halo_membership.py \
-  --newfinder path/to/cosmological/native_catalogue \
+  --new-finder path/to/cosmological/native_catalogue \
   --snapshot Simulation/data/snap_128.hdf5 \
   --output LRdata/cosmological_newfinder_128.hdf5
 ```
