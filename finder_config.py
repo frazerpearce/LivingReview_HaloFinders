@@ -18,6 +18,7 @@ FINDERS = {
         "derived": "LRdata/cosmological_ahf_128_derived.txt",
         "catalogue": "LRdata/cosmological_ahf_128.hdf5",
         "king_catalogue": "LRdata/unit_test_king_ahf.hdf5",
+        "infall_catalogue": "LRdata/king_infall_ahf.hdf5",
     },
     "subfind": {
         "label": "SUBFIND",
@@ -26,6 +27,7 @@ FINDERS = {
         "derived": "LRdata/cosmological_subfind_128_derived.txt",
         "catalogue": "LRdata/cosmological_subfind_128.hdf5",
         "king_catalogue": "LRdata/unit_test_king_subfind.hdf5",
+        "infall_catalogue": "LRdata/king_infall_subfind.hdf5",
     },
     "rockstar": {
         "label": "ROCKSTAR",
@@ -34,6 +36,7 @@ FINDERS = {
         "derived": "LRdata/cosmological_rockstar_128_derived.txt",
         "catalogue": "LRdata/cosmological_rockstar_128.hdf5",
         "king_catalogue": "LRdata/unit_test_king_rockstar.hdf5",
+        "infall_catalogue": "LRdata/king_infall_rockstar.hdf5",
     },
 }
 

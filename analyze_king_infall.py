@@ -148,8 +148,8 @@ def load_truth(
 
 def default_catalogues() -> list[Path]:
     paths = [
-        Path(f"LRdata/king_infall_{key}.hdf5")
-        for key in FINDERS
+        Path(config["infall_catalogue"])
+        for config in FINDERS.values()
     ]
     return [path for path in paths if path.exists()]
 

@@ -159,13 +159,15 @@ Add an entry to `FINDERS` in `finder_config.py`:
     "derived": "LRdata/cosmological_newfinder_128_derived.txt",
     "catalogue": "LRdata/cosmological_newfinder_128.hdf5",
     "king_catalogue": "LRdata/unit_test_king_newfinder.hdf5",
+    "infall_catalogue": "LRdata/king_infall_newfinder.hdf5",
 },
 ```
 
 Dictionary order controls plot order. Do not change `REFERENCE_FINDER` unless
 you deliberately want another finder to seed the cosmological cross-matching.
-The King-infall analysis automatically looks for
-`LRdata/king_infall_<finder>.hdf5`.
+`analyze_king.py`, `analyze_king_infall.py`, and `analyze_cosmo.py` obtain their
+default catalogue paths from `king_catalogue`, `infall_catalogue`, and
+`catalogue`, respectively.
 
 ## Test 1: King unit test
 
@@ -285,4 +287,3 @@ three standardized HDF5 files.
 Before returning the files, verify that all three analysis commands complete
 without errors and inspect the generated summaries and figures for obviously
 incorrect units, missing memberships, or duplicate objects.
-
