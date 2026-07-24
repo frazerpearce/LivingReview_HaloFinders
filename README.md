@@ -277,17 +277,8 @@ LRdata/cosmological_<finder>_128.hdf5
 These files are the primary test deliverables. They contain the catalogue
 properties and particle memberships needed to reproduce all comparisons.
 
-Also return:
-
-```text
-LRdata/cosmological_<finder>_128_derived.txt
-```
-
-This file is reproducible with `LR_base_analysis.py`, but including it makes
-the CosmoBox analysis immediately runnable.
-
-Please state the finder name and version, the configuration/parameter file used
-for each test, and any preprocessing needed to run the finder. Native catalogues
+Please also supply the finder name and version, the configuration/parameter file used
+for each test, and any preprocessing needed to run the finder together with a link to the downloadable source if this exists. Native catalogues
 and generated figures are useful for diagnosis but are not substitutes for the
 three standardized HDF5 files.
 
