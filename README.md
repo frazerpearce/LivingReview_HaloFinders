@@ -1,12 +1,16 @@
 # LivingReview Halo-Finder Tests
 
-This repository provides three common tests for comparing halo finders:
+This repository provides five common tests for comparing halo finders:
 
 1. **King unit test** — recovery of two isolated, equal-mass King-model haloes.
 2. **King infall test** — recovery of lower-mass King haloes at different radii
    from a central host, compared particle by particle with their isolated
    counterparts.
-3. **CosmoBox test** — comparison of halo and subhalo populations in a
+3. **Major-merger test** — recovery of two equal-mass King haloes through a
+   controlled sequence of decreasing separations.
+4. **Minor-merger test** — recovery of a 1:100 King satellite as it approaches
+   and overlaps a primary King halo.
+5. **CosmoBox test** — comparison of halo and subhalo populations in a
    cosmological dark-matter simulation.
 
 The aim is not to require every halo finder to expose the same native catalogue
@@ -16,7 +20,7 @@ that common format.
 
 ## What is supplied
 
-The two compact test snapshots are included:
+The two compact seed snapshots are included:
 
 ```text
 Simulation/data/unit_test_king_box.hdf5
@@ -25,6 +29,11 @@ Simulation/data/king_infall.hdf5
 
 Common-format results from AHF, SUBFIND, and ROCKSTAR are included in
 `LRdata/` for comparison.
+
+The major- and minor-merger generators use these seed snapshots to build two
+eleven-snapshot controlled sequences under `Simulation/Major_Merger_ICs/` and
+`Simulation/Minor_Merger_ICs/`. These configurations scan halo separation;
+they are not successive outputs of a dynamical time integration.
 
 The CosmoBox initial conditions/snapshot and the corresponding comparison
 catalogues are too large for GitHub. Request them from
@@ -44,7 +53,7 @@ Run all commands below from the repository root.
 
 ## Input snapshot format
 
-All three tests use Gadget-style HDF5 snapshots. Dark-matter particles are in
+All five tests use Gadget-style HDF5 snapshots. Dark-matter particles are in
 `/PartType1`:
 
 ```text
@@ -230,7 +239,108 @@ Outputs are written to `output_king_infall/`. This test matches objects using
 particle-ID overlap and reports how satellite recovery changes with host-centric
 radius relative to the corresponding isolated King model.
 
-## Test 3: CosmoBox
+## Test 3: Controlled major-merger test
+
+Generate the eleven equal-mass configurations with:
+
+```bash
+python generate_major_merger.py
+```
+
+This places two identical King haloes in a cropped
+$5\,h^{-1}{\rm Mpc}$ box. Their centre separation decreases from
+$1000$ to $0\,h^{-1}{\rm kpc}$ in $100\,h^{-1}{\rm kpc}$ steps while their
+internal particle realizations and persistent IDs remain fixed. Run the same
+finder configuration, as far as practical, on:
+
+```text
+Simulation/Major_Merger_ICs/major_merger_000.hdf5
+...
+Simulation/Major_Merger_ICs/major_merger_010.hdf5
+```
+
+Convert every native catalogue using its corresponding snapshot. Use the
+following common-output naming convention:
+
+```text
+LRdata/Major_Merger/major_merger_<snapshot>_<finder>.hdf5
+```
+
+For example:
+
+```bash
+python convert_halo_membership.py \
+  --new-finder path/to/major_merger_000/native_catalogue \
+  --snapshot Simulation/Major_Merger_ICs/major_merger_000.hdf5 \
+  --output LRdata/Major_Merger/major_merger_000_newfinder.hdf5
+```
+
+After all eleven catalogues have been converted, add the new finder key to
+`FINDER_ORDER` in `analyze_major_merger.py`;
+`analyze_minor_merger.py` imports and uses the same list. The corresponding
+label and colour continue to come from `finder_config.py`. Then run:
+
+```bash
+python analyze_major_merger.py \
+  --snapshot-dir Simulation/Major_Merger_ICs \
+  --catalogue-dir LRdata/Major_Merger
+```
+
+The analysis assigns distinct recovered objects to the two injected
+progenitors by maximising particle-ID overlap at each separation. It plots the
+recovered centres and catalogue radii and annotates each recovered mass relative
+to that progenitor's well-separated value. The figure is written to
+`output_major_merger/major_merger_recovered_halo_sequence.png`.
+
+## Test 4: Controlled minor-merger test
+
+First generate the major-merger sequence and the King-infall seed snapshot,
+then create the 1:100 sequence with:
+
+```bash
+python generate_minor_merger.py
+```
+
+The eleven configurations combine the primary King halo with a self-similar
+satellite containing one hundredth of its mass. Their centre separation
+decreases from $500$ to $0\,h^{-1}{\rm kpc}$ in
+$50\,h^{-1}{\rm kpc}$ steps. The common particle mass means that the satellite
+contains one hundredth as many particles as the primary. Run the finder on:
+
+```text
+Simulation/Minor_Merger_ICs/minor_merger_000.hdf5
+...
+Simulation/Minor_Merger_ICs/minor_merger_010.hdf5
+```
+
+Convert every result using the corresponding snapshot and write it as:
+
+```text
+LRdata/Minor_Merger/minor_merger_<snapshot>_<finder>.hdf5
+```
+
+For example:
+
+```bash
+python convert_halo_membership.py \
+  --new-finder path/to/minor_merger_000/native_catalogue \
+  --snapshot Simulation/Minor_Merger_ICs/minor_merger_000.hdf5 \
+  --output LRdata/Minor_Merger/minor_merger_000_newfinder.hdf5
+```
+
+Analyse all eleven common catalogues with:
+
+```bash
+python analyze_minor_merger.py \
+  --snapshot-dir Simulation/Minor_Merger_ICs \
+  --catalogue-dir LRdata/Minor_Merger
+```
+
+The matching again uses the exact injected particle-ID sets, now distinguishing
+the primary and 1:100 satellite. The resulting sequence is written to
+`output_minor_merger/minor_merger_recovered_halo_sequence.png`.
+
+## Test 5: CosmoBox
 
 First obtain the CosmoBox snapshot and existing comparison outputs from
 [frazer.pearce@nottingham.ac.uk](mailto:frazer.pearce@nottingham.ac.uk). Place
@@ -271,11 +381,13 @@ contains the other finders' cosmological outputs needed for these comparisons.
 
 ## What to return
 
-Please return the three standardized HDF5 files produced by the converter:
+Please return the standardized HDF5 files produced by the converter:
 
 ```text
 LRdata/unit_test_king_<finder>.hdf5
 LRdata/king_infall_<finder>.hdf5
+LRdata/Major_Merger/major_merger_000_<finder>.hdf5 ... major_merger_010_<finder>.hdf5
+LRdata/Minor_Merger/minor_merger_000_<finder>.hdf5 ... minor_merger_010_<finder>.hdf5
 LRdata/cosmological_<finder>_128.hdf5
 ```
 
@@ -285,8 +397,8 @@ properties and particle memberships needed to reproduce all comparisons.
 Please also supply the finder name and version, the configuration/parameter file used
 for each test, and any preprocessing needed to run the finder together with a link to the downloadable source if this exists. Native catalogues
 and generated figures are useful for diagnosis but are not substitutes for the
-three standardized HDF5 files.
+standardized HDF5 files.
 
-Before returning the files, verify that all three analysis commands complete
+Before returning the files, verify that all five analysis commands complete
 without errors and inspect the generated summaries and figures for obviously
 incorrect units, missing memberships, or duplicate objects.
