@@ -16,6 +16,7 @@ from typing import Optional
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.lines import Line2D
 
 from finder_config import FINDERS
 from plot_config import apply_plot_style
@@ -869,13 +870,15 @@ def plot_membership_residual_profiles(
     matches: dict[int, list[FinderMatch]],
 ) -> None:
     fig, ax = plt.subplots(figsize=(7.2, 5.0), constrained_layout=True)
-    halo_colors = ["C0", "C1", "C2", "C3"]
+    location_colors = {0: "C0", 1: "C1"}
+    location_labels = {0: "Centre", 1: "Corner"}
     finder_label = next(
         (match.finder.label for match_list in matches.values() for match in match_list),
         "Finder",
     )
 
-    for truth, halo_color in zip(truth_halos, halo_colors):
+    for truth in truth_halos:
+        halo_color = location_colors[truth.index]
         for match in matches[truth.index]:
             king_r200_ids = match.truth_ids_in_r200
             finder_r200_ids = match.ids_in_r200
@@ -893,15 +896,11 @@ def plot_membership_residual_profiles(
 
             missing_ids = np.setdiff1d(king_r200_ids, finder_r200_ids, assume_unique=False)
             finder_extra_ids = np.setdiff1d(finder_r200_ids, king_r200_ids, assume_unique=False)
-            quiet_background_ids = np.setdiff1d(finder_r200_ids, truth.particle_ids, assume_unique=False)
-
             missing_idx = indices_for_ids(snapshot, missing_ids)
             extra_idx = indices_for_ids(snapshot, finder_extra_ids)
-            quiet_idx = indices_for_ids(snapshot, quiet_background_ids)
 
             missing_r = periodic_distance(snapshot.pos[missing_idx], truth.centre, snapshot.box_size)
             extra_r = periodic_distance(snapshot.pos[extra_idx], truth.centre, snapshot.box_size)
-            quiet_r = periodic_distance(snapshot.pos[quiet_idx], truth.centre, snapshot.box_size)
 
             bins = np.linspace(0.0, r_outer, 81)
             ax.hist(
@@ -919,7 +918,6 @@ def plot_membership_residual_profiles(
                 color=halo_color,
                 linestyle="-",
                 linewidth=1.6,
-                label=f"King {truth.index} missing King R200",
             )
             ax.hist(
                 extra_r,
@@ -928,21 +926,13 @@ def plot_membership_residual_profiles(
                 color=halo_color,
                 linestyle="--",
                 linewidth=1.6,
-                label=f"King {truth.index} finder R200 not King R200",
-            )
-            ax.hist(
-                quiet_r,
-                bins=bins,
-                histtype="step",
-                color=halo_color,
-                linestyle=":",
-                linewidth=1.9,
-                label=f"King {truth.index} quiet background in finder",
             )
 
-    ax.set_xlabel(r"$r$ from true King centre [kpc/h]")
-    ax.set_ylabel("Particles per radial bin")
-    ax.set_ylim(0.0, 250.0)
+    ax.set_xlabel(r"$r$ from true King centre [kpc/h]", fontsize=15)
+    ax.set_ylabel("Particles per radial bin", fontsize=15)
+    ax.set_xlim(0.0, 275.0)
+    ax.set_ylim(0.0, 170.0)
+    ax.tick_params(axis="both", labelsize=15)
     ax.text(
         0.03,
         0.5,
@@ -950,11 +940,27 @@ def plot_membership_residual_profiles(
         transform=ax.transAxes,
         ha="left",
         va="center",
-        fontsize=13,
+        fontsize=15,
         fontweight="bold",
         bbox={"boxstyle": "round,pad=0.25", "facecolor": "white", "edgecolor": "0.7", "alpha": 0.85},
     )
-    ax.legend(fontsize=7.5, ncol=2)
+    location_handles = [
+        Line2D([], [], color=location_colors[index], linewidth=2.0,
+               label=location_labels[index])
+        for index in (0, 1)
+    ]
+    residual_handles = [
+        Line2D([], [], color="0.2", linestyle="-", linewidth=1.6,
+               label="Missing from finder $R_{200}$"),
+        Line2D([], [], color="0.2", linestyle="--", linewidth=1.6,
+               label="Extra in finder $R_{200}$"),
+    ]
+    ax.legend(
+        handles=location_handles + residual_handles,
+        fontsize=10.0,
+        ncol=2,
+        loc="upper left",
+    )
     fig.savefig(path, dpi=200)
     plt.close(fig)
 
